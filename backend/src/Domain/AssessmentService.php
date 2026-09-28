@@ -23,20 +23,21 @@ final class AssessmentService
 
     /**
      * @param array<string,mixed> $payload
-     * @return array{vehicle_age:int,ltv:float,decision:string,approved_limit:int,input:array<string,mixed>}
+     * @return array{vehicle_age:int,ltv:float,decision:string,reason:string,approved_limit:int,input:array<string,mixed>}
      */
     public function assess(array $payload): array
     {
         $input = $this->validator->validate($payload);
 
         $ltv = $this->ltvCalculator->calculate($input['requested_amount'], $input['market_value']);
-        $decision = $this->decisionEngine->decide($ltv);
+        $decision = $this->decisionEngine->decide($ltv, $input['mileage']);
 
         return [
             'vehicle_age' => $this->vehicleAge->inYears($input['year']),
             'ltv' => $ltv,
-            'decision' => $decision,
-            'approved_limit' => $decision === DecisionEngine::APPROVE ? $input['requested_amount'] : 0,
+            'decision' => $decision->decision,
+            'reason' => $decision->reason,
+            'approved_limit' => $decision->decision === DecisionEngine::APPROVE ? $input['requested_amount'] : 0,
             'input' => $input,
         ];
     }

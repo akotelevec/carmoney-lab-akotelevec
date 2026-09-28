@@ -40,8 +40,12 @@ final class ApplicationValidator
             $errors['year'] = sprintf('Возраст авто больше %d лет', $this->rules['vehicle']['max_age_years']);
         }
 
-        $mileage = (int) ($payload['mileage'] ?? -1);
-        if ($mileage < 0 || $mileage > $this->rules['vehicle']['max_mileage_km']) {
+        $rawMileage = $payload['mileage'] ?? null;
+        $mileage = (int) $rawMileage;
+
+        if ($rawMileage === null || $rawMileage === '') {
+            $errors['mileage'] = 'Укажите пробег';
+        } elseif ($mileage < 0 || $mileage > $this->rules['vehicle']['max_mileage_km']) {
             $errors['mileage'] = sprintf('Пробег от 0 до %d км', $this->rules['vehicle']['max_mileage_km']);
         }
 
