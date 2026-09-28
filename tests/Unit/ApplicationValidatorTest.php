@@ -8,19 +8,23 @@ use CarMoneyLab\Domain\ApplicationValidator;
 use CarMoneyLab\Domain\ValidationException;
 use CarMoneyLab\Domain\VehicleAge;
 use CarMoneyLab\Domain\VinValidator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ApplicationValidatorTest extends TestCase
 {
     private ApplicationValidator $validator;
 
+    /** @var array<string,mixed> */
+    private array $rules;
+
     protected function setUp(): void
     {
-        $rules = require __DIR__ . '/../../backend/config/rules.php';
+        $this->rules = require __DIR__ . '/../../backend/config/rules.php';
 
         $this->validator = new ApplicationValidator(
-            $rules,
-            new VinValidator($rules['vin']),
+            $this->rules,
+            new VinValidator($this->rules['vin']),
             new VehicleAge((int) date('Y')),
         );
     }
@@ -77,6 +81,58 @@ final class ApplicationValidatorTest extends TestCase
                 ['vin', 'market_value', 'term_months'],
                 array_keys($exception->errors()),
             );
+        }
+    }
+
+    public function testRejectsApplicationWithoutMileage(): void
+    {
+        $payload = $this->validPayload();
+        unset($payload['mileage']);
+
+        try {
+            $this->validator->validate($payload);
+            self::fail('Ожидали ValidationException');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('mileage', $exception->errors());
+        }
+    }
+
+    #[DataProvider('emptyMileageValues')]
+    public function testRejectsEmptyMileage(mixed $mileage): void
+    {
+        try {
+            $this->validator->validate($this->validPayload(['mileage' => $mileage]));
+            self::fail('Ожидали ValidationException');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('mileage', $exception->errors());
+        }
+    }
+
+    /** @return array<string,array{mixed}> */
+    public static function emptyMileageValues(): array
+    {
+        return [
+            'null' => [null],
+            'пустая строка' => [''],
+        ];
+    }
+
+    public function testAcceptsZeroMileage(): void
+    {
+        $result = $this->validator->validate($this->validPayload(['mileage' => 0]));
+
+        self::assertSame(0, $result['mileage']);
+    }
+
+    public function testRejectsMileageAboveValidationCeiling(): void
+    {
+        $mileage = (int) $this->rules['vehicle']['max_mileage_km'] + 1;
+
+        try {
+            $this->validator->validate($this->validPayload(['mileage' => $mileage]));
+            self::fail('Ожидали ValidationException');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('mileage', $exception->errors());
         }
     }
 }
